@@ -19,6 +19,29 @@ jobs:
         with:
           submodules: true
           lfs: false
+
+      # CIPP requires engines.node ^22.22.2, but Oryx (the builder bundled into
+      # the Static Web Apps action) only supports up to 22.22.0 on the 22.x line
+      # and fails the build outright. Build here instead and hand SWA the
+      # finished artifact via skip_app_build.
+      - name: Get Node version from package.json
+        id: get_node_version
+        run: |
+          node_raw_version=$(node -p "require('./package.json').engines.node")
+          node_sanitized_version=$(echo "$node_raw_version" | sed -E 's/[^0-9.]+//g')
+          echo "node_version=$node_sanitized_version" >> $GITHUB_OUTPUT
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ steps.get_node_version.outputs.node_version }}
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build
+        run: npm run build
+
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
@@ -28,9 +51,17 @@ jobs:
           action: "upload"
           ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
           # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
-          app_location: "/" # App source code path
+          # With skip_app_build, app_location is the PRE-BUILT output directory
+          # and output_location must be empty.
+          app_location: "/out"
           api_location: "" # Api source code path - optional
-          output_location: "/out" # Built app content directory - optional
+          output_location: ""
+          skip_app_build: true
+          # Dependabot PRs cannot read repository secrets, so the deploy token is
+          # absent on those runs. Without this they fail with "deployment_token was
+          # not provided", which masks genuine failures. The build still runs (so the
+          # dependency bump is validated); only the deploy step is skipped.
+          skip_deploy_on_missing_secrets: true
           ###### End of Repository/Build Configurations ######
 
   close_pull_request_job:
