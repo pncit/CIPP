@@ -39,6 +39,18 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      # Integrations > CIPP-API > API Documentation loads /openapi.json as a static
+      # asset. Upstream generates it inside their container build (CyberDrain/CIPP
+      # build/tools/build-openapi.ps1) and gitignores the frontend copy, so it never
+      # reaches this repo. The backend repo commits the same generated spec as
+      # Config/openapi.json, so take it from our backend fork. Keep both forks synced
+      # together, or the docs will describe a different API version than is deployed.
+      - name: Fetch OpenAPI spec from backend fork
+        run: |
+          curl -fsSL --retry 3 -o public/openapi.json \
+            https://raw.githubusercontent.com/pncit/CIPP-API/master/Config/openapi.json
+          jq -e '.openapi and (.paths | length > 0)' public/openapi.json > /dev/null
+
       - name: Build
         run: npm run build
 

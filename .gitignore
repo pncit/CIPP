@@ -42,3 +42,6 @@ __*
 AzuriteConfig
 # Claude/Cursor worktrees and local AI tooling
 .claude/
+
+# Fetched from pncit/CIPP-API at deploy time (see the Static Web Apps workflow)
+public/openapi.json
